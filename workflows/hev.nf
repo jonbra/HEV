@@ -58,6 +58,8 @@ workflow HEV {
     // Module: Map reads to a set of HEV reference genomes to keep mapped reads
     //
     MINIMAP2_ALIGN(
+        SAMTOOLS_BAM2FQ.out.reads,
+        [[], file(params.references)]
 
     )
 
