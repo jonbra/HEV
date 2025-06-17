@@ -1,0 +1,15 @@
+repository_type: pipeline
+
+nf_core_version: 3.3.1
+
+lint: {}
+
+template:
+  org: nf-core
+  name: hev
+  description: Test HEV
+  author: "Jon Br\xE5te"
+  version: 1.0.0dev
+  force: true
+  outdir: .
+  is_nfcore: true
