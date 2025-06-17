@@ -75,8 +75,10 @@ workflow PIPELINE_INITIALISATION {
     Channel
         .fromList(samplesheetToList(params.input, "${projectDir}/assets/schema_input.json"))
         .map { meta, bam_path ->
-                tuple(meta.id, meta, file(bam_path)) // id, meta, bam
-        }
+        // Add single_end: true to the metadata map
+        def new_meta = meta + [single_end: true]
+        return [ new_meta.id, new_meta, file(bam_path) ]
+    }
         .groupTuple() // id, List(meta), List(bam)
         .map { samplesheet ->
             validateInputSamplesheet(samplesheet)
