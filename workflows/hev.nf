@@ -5,6 +5,7 @@
 */
 include { FASTQC                 } from '../modules/nf-core/fastqc/main'
 include { MULTIQC                } from '../modules/nf-core/multiqc/main'
+include { SAMTOOLS_BAM2FQ        } from '../modules/nf-core/samtools/bam2fq/main' 
 include { paramsSummaryMap       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -24,14 +25,26 @@ workflow HEV {
 
     ch_versions = Channel.empty()
     ch_multiqc_files = Channel.empty()
+    
+    //
+    // MODULE: Run Samtools bam2fq
+    //
+    SAMTOOLS_BAM2FQ (
+        ch_samplesheet,
+        false // Do not split reads into pairs
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_BAM2FQ.out.versions.first())
+
     //
     // MODULE: Run FastQC
     //
+    SAMTOOLS_BAM2FQ.out.reads.view()
     FASTQC (
-        ch_samplesheet
+        SAMTOOLS_BAM2FQ.out.reads
     )
-    ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]})
     ch_versions = ch_versions.mix(FASTQC.out.versions.first())
+    ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]})
+    
 
     //
     // Collate and save software versions
