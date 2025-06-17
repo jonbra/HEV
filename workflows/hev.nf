@@ -4,10 +4,13 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 include { FASTQC                 } from '../modules/nf-core/fastqc/main'
+include { FLYE } from '../modules/nf-core/flye/main'
 include { MINIMAP2_ALIGN         } from '../modules/nf-core/minimap2/align/main'
 include { MULTIQC                } from '../modules/nf-core/multiqc/main'
 include { PRINSEQPLUSPLUS        } from '../modules/nf-core/prinseqplusplus/main' 
 include { SAMTOOLS_BAM2FQ        } from '../modules/nf-core/samtools/bam2fq/main' 
+include { SAMTOOLS_BAM2FQ as SAMTOOLS_BAM2FQ_MAPPED        } from '../modules/nf-core/samtools/bam2fq/main' 
+include { SPADES } from '../modules/nf-core/spades/main'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -59,10 +62,36 @@ workflow HEV {
     //
     MINIMAP2_ALIGN(
         SAMTOOLS_BAM2FQ.out.reads,
-        [[], file(params.references)]
-
+        [[], file(params.references)],
+        true, // Save as bam file
+        'bai', // Index extension for bam files
+        false,
+        false
     )
+    ch_versions = ch_versions.mix(MINIMAP2_ALIGN.out.versions.first())
 
+    //
+    // Module: Convert mapped reads to fastq
+    //
+    SAMTOOLS_BAM2FQ_MAPPED (
+        MINIMAP2_ALIGN.out.bam,
+        false // Do not split reads into pairs
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_BAM2FQ_MAPPED.out.versions.first())
+
+    //
+    // Module: Run Spades to assemble reads
+    //
+    FLYE (
+        SAMTOOLS_BAM2FQ_MAPPED.out.reads,
+        "--nano-raw" // Flye mode for nanopore reads
+    )
+    ch_versions = ch_versions.mix(FLYE.out.versions.first())
+
+    //
+    // Module: Blast assembled output against HEV reference genomes
+    //
+    
     //
     // Collate and save software versions
     //
