@@ -4,7 +4,9 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 include { FASTQC                 } from '../modules/nf-core/fastqc/main'
+include { MINIMAP2_ALIGN         } from '../modules/nf-core/minimap2/align/main'
 include { MULTIQC                } from '../modules/nf-core/multiqc/main'
+include { PRINSEQPLUSPLUS        } from '../modules/nf-core/prinseqplusplus/main' 
 include { SAMTOOLS_BAM2FQ        } from '../modules/nf-core/samtools/bam2fq/main' 
 include { paramsSummaryMap       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -25,7 +27,7 @@ workflow HEV {
 
     ch_versions = Channel.empty()
     ch_multiqc_files = Channel.empty()
-    
+
     //
     // MODULE: Run Samtools bam2fq
     //
@@ -38,13 +40,26 @@ workflow HEV {
     //
     // MODULE: Run FastQC
     //
-    SAMTOOLS_BAM2FQ.out.reads.view()
     FASTQC (
         SAMTOOLS_BAM2FQ.out.reads
     )
     ch_versions = ch_versions.mix(FASTQC.out.versions.first())
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]})
     
+    //
+    // Module: Run Prinseq++ to filter fastq reads on length
+    //
+    PRINSEQPLUSPLUS (
+        SAMTOOLS_BAM2FQ.out.reads
+    )
+    ch_versions = ch_versions.mix(PRINSEQPLUSPLUS.out.versions.first())
+
+    //
+    // Module: Map reads to a set of HEV reference genomes to keep mapped reads
+    //
+    MINIMAP2_ALIGN(
+
+    )
 
     //
     // Collate and save software versions
