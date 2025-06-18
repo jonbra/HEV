@@ -3,6 +3,9 @@
     IMPORT MODULES / SUBWORKFLOWS / FUNCTIONS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
+include { BLAST_BLASTN } from '../modules/nf-core/blast/blastn/main'
+include { BLAST_MAKEBLASTDB } from '../modules/nf-core/blast/makeblastdb/main'
+include { BLASTPARSE } from '../modules/local/blastparse/main'
 include { FASTQC                 } from '../modules/nf-core/fastqc/main'
 include { FLYE } from '../modules/nf-core/flye/main'
 include { MINIMAP2_ALIGN         } from '../modules/nf-core/minimap2/align/main'
@@ -32,6 +35,14 @@ workflow HEV {
     ch_multiqc_files = Channel.empty()
 
     //
+    // MODULE: Make BLAST database from HEV reference genomes
+    //
+    BLAST_MAKEBLASTDB (
+        [ [id:"blast_db"], file(params.references) ] // Add empty meta.id map before the references file
+    )
+    ch_versions = ch_versions.mix(BLAST_MAKEBLASTDB.out.versions.first())
+
+    //
     // MODULE: Run Samtools bam2fq
     //
     SAMTOOLS_BAM2FQ (
@@ -50,7 +61,7 @@ workflow HEV {
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]})
     
     //
-    // Module: Run Prinseq++ to filter fastq reads on length
+    // MODULE: Run Prinseq++ to filter fastq reads on length
     //
     PRINSEQPLUSPLUS (
         SAMTOOLS_BAM2FQ.out.reads
@@ -58,7 +69,7 @@ workflow HEV {
     ch_versions = ch_versions.mix(PRINSEQPLUSPLUS.out.versions.first())
 
     //
-    // Module: Map reads to a set of HEV reference genomes to keep mapped reads
+    // MODULE: Map reads to a set of HEV reference genomes to keep mapped reads
     //
     MINIMAP2_ALIGN(
         SAMTOOLS_BAM2FQ.out.reads,
@@ -71,7 +82,7 @@ workflow HEV {
     ch_versions = ch_versions.mix(MINIMAP2_ALIGN.out.versions.first())
 
     //
-    // Module: Convert mapped reads to fastq
+    // MODULE: Convert mapped reads to fastq
     //
     SAMTOOLS_BAM2FQ_MAPPED (
         MINIMAP2_ALIGN.out.bam,
@@ -80,7 +91,7 @@ workflow HEV {
     ch_versions = ch_versions.mix(SAMTOOLS_BAM2FQ_MAPPED.out.versions.first())
 
     //
-    // Module: Run Spades to assemble reads
+    // MODULE: Run Spades to assemble reads
     //
     FLYE (
         SAMTOOLS_BAM2FQ_MAPPED.out.reads,
@@ -89,9 +100,23 @@ workflow HEV {
     ch_versions = ch_versions.mix(FLYE.out.versions.first())
 
     //
-    // Module: Blast assembled output against HEV reference genomes
+    // MODULE: Blast assembled output against HEV reference genomes
     //
-    
+    BLAST_BLASTN (
+        FLYE.out.fasta,
+        BLAST_MAKEBLASTDB.out.db
+    )
+    ch_versions = ch_versions.mix(BLAST_BLASTN.out.versions.first())
+
+    //
+    // MODULE: Parse the blast output
+    //
+    BLASTPARSE (
+        BLAST_BLASTN.out.txt.join(FLYE.out.fasta), // tuple val(meta), path(blast_out), path(scaffolds)
+        file(params.references), // path to the same references used in the Blastn
+    )
+    ch_versions = ch_versions.mix(BLASTPARSE.out.versions.first())
+
     //
     // Collate and save software versions
     //
