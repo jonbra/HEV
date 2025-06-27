@@ -8,6 +8,7 @@ include { BLAST_MAKEBLASTDB } from '../modules/nf-core/blast/makeblastdb/main'
 include { BLASTPARSE } from '../modules/local/blastparse/main'
 include { FASTQC                 } from '../modules/nf-core/fastqc/main'
 include { FLYE } from '../modules/nf-core/flye/main'
+include { KRAKEN2_KRAKEN2 } from '../modules/nf-core/kraken2/kraken2/main'
 include { MINIMAP2_ALIGN         } from '../modules/nf-core/minimap2/align/main'
 include { MULTIQC                } from '../modules/nf-core/multiqc/main'
 include { PRINSEQPLUSPLUS        } from '../modules/nf-core/prinseqplusplus/main' 
@@ -69,10 +70,21 @@ workflow HEV {
     ch_versions = ch_versions.mix(PRINSEQPLUSPLUS.out.versions.first())
 
     //
+    // MODULE: Run Kraken2 to classify reads
+    //
+    KRAKEN2_KRAKEN2(
+        PRINSEQPLUSPLUS.out.reads,
+        file(params.kraken_all_db),
+        false,
+        false
+    )
+    ch_versions = ch_versions.mix(KRAKEN2_KRAKEN2.out.versions.first())
+
+    //
     // MODULE: Map reads to a set of HEV reference genomes to keep mapped reads
     //
     MINIMAP2_ALIGN(
-        SAMTOOLS_BAM2FQ.out.reads,
+        PRINSEQPLUSPLUS.out.good_reads,
         [[], file(params.references)],
         true, // Save as bam file
         'bai', // Index extension for bam files
@@ -159,6 +171,7 @@ workflow HEV {
             sort: true
         )
     )
+    ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_KRAKEN2.out.report.collect{it[1]}.ifEmpty([]))
 
     MULTIQC (
         ch_multiqc_files.collect(),
