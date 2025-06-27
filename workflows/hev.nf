@@ -73,7 +73,7 @@ workflow HEV {
     // MODULE: Run Kraken2 to classify reads
     //
     KRAKEN2_KRAKEN2(
-        PRINSEQPLUSPLUS.out.reads,
+        PRINSEQPLUSPLUS.out.good_reads,
         file(params.kraken_all_db),
         false,
         false
